@@ -63,10 +63,28 @@ export class ChannelManager {
     this.channels[index].clearError();
   }
 
+  playFromHistory(index: ChannelIndex, historyIndex: number): string | null {
+    const history = this.channels[index].getHistory();
+    if (historyIndex >= 0 && historyIndex < history.length) {
+      return history[historyIndex].url;
+    }
+    return null;
+  }
+
   async cleanup(): Promise<void> {
     await Promise.all([
       this.channels[0].dispose(),
       this.channels[1].dispose(),
     ]);
+  }
+
+  lockState(): void {
+    this.channels[0].setStateLock(true);
+    this.channels[1].setStateLock(true);
+  }
+
+  unlockState(): void {
+    this.channels[0].setStateLock(false);
+    this.channels[1].setStateLock(false);
   }
 }

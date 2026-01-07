@@ -18,6 +18,19 @@ export function extractVideoID(url: string): string | null {
   return null;
 }
 
+export async function getVideoTitle(url: string): Promise<string> {
+  try {
+    const response = await fetch(`https://www.youtube.com/oembed?url=${encodeURIComponent(url)}&format=json`);
+    if (!response.ok) {
+      return 'Unknown Title';
+    }
+    const data = await response.json() as { title?: string };
+    return data.title || 'Unknown Title';
+  } catch (error) {
+    return 'Unknown Title';
+  }
+}
+
 export function formatVolume(level: number): string {
   const bars = Math.floor(level / 10);
   const filled = '█'.repeat(bars);
@@ -29,4 +42,10 @@ export function truncateURL(url: string | null, maxLength: number = 50): string 
   if (!url) return '(empty)';
   if (url.length <= maxLength) return url;
   return url.substring(0, maxLength - 3) + '...';
+}
+
+export function truncateText(text: string | null, maxLength: number = 50): string {
+  if (!text) return '';
+  if (text.length <= maxLength) return text;
+  return text.substring(0, maxLength - 3) + '...';
 }

@@ -9,6 +9,7 @@ export interface KeyHandlerCallbacks {
   onVolumeDown: () => void;
   onQuit: () => void;
   onEnterURL: () => void;
+  onPlayHistory: (index: number) => void;
 }
 
 export class KeyHandler {
@@ -78,6 +79,14 @@ export class KeyHandler {
         this.callbacks.onEnterURL();
       }
     });
+
+    for (let i = 1; i <= 9; i++) {
+      this.screen.key([`M-${i}`], () => {
+        if (this.enabled) {
+          this.callbacks.onPlayHistory(i - 1);
+        }
+      });
+    }
   }
 
   enable(): void {

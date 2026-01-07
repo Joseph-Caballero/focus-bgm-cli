@@ -1,7 +1,7 @@
 import * as blessed from 'blessed';
 import { ChannelState } from '../audio/types';
 import { UI_STYLES } from './styles';
-import { truncateURL, formatVolume } from '../utils/youtube';
+import { truncateURL, truncateText, formatVolume } from '../utils/youtube';
 
 const STATUS_BAR_HEIGHT = 3;
 
@@ -29,10 +29,12 @@ export class ChannelPanel {
     this.updateContent({
       id: channelId as 0 | 1,
       url: null,
+      title: null,
       playing: false,
       volume: 80,
       loading: false,
       error: null,
+      history: [],
     });
   }
 
@@ -49,6 +51,7 @@ export class ChannelPanel {
     const statusText = this.getStatusText(state);
     const volumeBar = formatVolume(state.volume);
     const urlDisplay = truncateURL(state.url, 45);
+    const titleDisplay = truncateText(state.title, 45);
     
     let content = '';
 
@@ -62,13 +65,25 @@ export class ChannelPanel {
     
     content += `${icon} ${statusText}\n\n`;
     
+    if (state.playing && state.title) {
+      content += `Title: {cyan-fg}${titleDisplay}{/cyan-fg}\n\n`;
+    }
+    
     if (state.url) {
       content += `URL: {cyan-fg}${urlDisplay}{/cyan-fg}\n\n`;
     } else {
       content += `URL: {gray-fg}(empty - paste YouTube URL){/gray-fg}\n\n`;
     }
     
-    content += `Volume: {green-fg}${volumeBar}{/green-fg} ${state.volume}%`;
+    content += `Volume: {green-fg}${volumeBar}{/green-fg} ${state.volume}%\n\n`;
+    
+    if (state.history.length > 0) {
+      content += `{bold}History:{/bold}\n`;
+      state.history.forEach((entry, index) => {
+        const shortTitle = truncateText(entry.title, 35);
+        content += `  ${index + 1}. {cyan-fg}${shortTitle}{/cyan-fg}\n`;
+      });
+    }
 
     this.box.setContent(content);
   }
@@ -80,16 +95,16 @@ export class ChannelPanel {
   }
 
   private getStatusText(state: ChannelState): string {
-    if (state.error) return `{${UI_STYLES.COLORS.ERROR}-fg}Error{/fg}`;
-    if (state.loading) return `{${UI_STYLES.COLORS.WARNING}-fg}Loading{/fg}`;
-    if (state.playing) return `{${UI_STYLES.COLORS.SUCCESS}-fg}Playing{/fg}`;
-    if (state.url) return `{${UI_STYLES.COLORS.WARNING}-fg}Paused{/fg}`;
-    return '{gray-fg}No media{/fg}';
+    if (state.error) return `{${UI_STYLES.COLORS.ERROR}-fg}Error{/${UI_STYLES.COLORS.ERROR}-fg}`;
+    if (!state.loading && state.url && !state.playing) return `{${UI_STYLES.COLORS.WARNING}-fg}Paused{/${UI_STYLES.COLORS.WARNING}-fg}`;
+    if (state.loading) return `{${UI_STYLES.COLORS.WARNING}-fg}Loading{/${UI_STYLES.COLORS.WARNING}-fg}`;
+    if (state.playing) return `{${UI_STYLES.COLORS.SUCCESS}-fg}Playing{/${UI_STYLES.COLORS.SUCCESS}-fg}`;
+    return '{gray-fg}No media{/gray-fg}';
   }
 
   showError(message: string): void {
     const currentContent = this.box.getContent() || '';
-    this.box.setContent(`${currentContent}\n\n{red-fg}${message}{/red-fg}`);
+    this.box.setContent(`${currentContent}\n\n{${UI_STYLES.COLORS.ERROR}-fg}${message}{/${UI_STYLES.COLORS.ERROR}-fg}`);
   }
 
   clearError(): void {

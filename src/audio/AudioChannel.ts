@@ -1,10 +1,12 @@
 const mpv = require('node-mpv');
-import { ChannelState, ChannelIndex } from './types'; 
+import { ChannelState, ChannelIndex, HistoryEntry } from './types';
+import { getVideoTitle } from '../utils/youtube'; 
 
 export class AudioChannel {
   private mpv: any;
   private state: ChannelState;
   private initialized: boolean = false;
+  private lockState: boolean = false;
   
   constructor(channelId: ChannelIndex) {
     // Use unique socket path for each channel to prevent interference
@@ -22,10 +24,12 @@ export class AudioChannel {
     this.state = {
       id: channelId,
       url: null,
+      title: null,
       playing: false,
       volume: 80,
       loading: false,
       error: null,
+      history: [],
     };
     
     this.setupEventListeners();
@@ -33,26 +37,32 @@ export class AudioChannel {
   
   private setupEventListeners(): void {
     this.mpv.on('started', () => {
+      if (this.lockState) return;
       this.state.playing = true;
       this.state.loading = false;
       this.state.error = null;
     });
     
     this.mpv.on('paused', () => {
+      if (this.lockState) return;
       this.state.playing = false;
+      this.state.loading = false;
     });
     
     this.mpv.on('resumed', () => {
+      if (this.lockState) return;
       this.state.playing = true;
       this.state.loading = false;
     });
     
     this.mpv.on('stopped', () => {
+      if (this.lockState) return;
       this.state.playing = false;
       this.state.loading = false;
     });
     
     this.mpv.on('error', (error: any) => {
+      if (this.lockState) return;
       this.state.error = error instanceof Error ? error.message : String(error);
       this.state.playing = false;
       this.state.loading = false;
@@ -67,12 +77,15 @@ export class AudioChannel {
   async play(url: string): Promise<void> {
     try {
       this.state.loading = true;
+      this.state.playing = false;
       this.state.error = null;
       
       if (!this.initialized) {
         this.initialize();
       } 
 
+      const title = await getVideoTitle(url);
+      
       // Use "replace" mode - loads a single URL for this channel only
       // Stop any current playback first to ensure clean state
       try {
@@ -81,11 +94,11 @@ export class AudioChannel {
         // Ignore stop errors if nothing was playing
       }
       
-      this.mpv.load(url, 'replace');
-      
       this.state.url = url;
-      this.state.playing = true;
-      this.state.loading = false;
+      this.state.title = title;
+      this.addToHistory({ url, title });
+      
+      this.mpv.load(url, 'replace');
     } catch (error) {
       this.state.loading = false;
       this.state.error = `Failed to play URL: ${error instanceof Error ? error.message : 'Unknown error'}`;
@@ -113,12 +126,23 @@ export class AudioChannel {
   }
   
   async togglePause(): Promise<void> {
+    if (this.state.loading) {
+      this.state.loading = false;
+      try {
+        this.mpv.stop();
+      } catch (e) {
+        // Ignore stop errors
+      }
+      return;
+    }
+    
     try {
       // Use explicit pause/resume to ensure this only affects this channel
       if (this.state.playing) {
         this.mpv.pause();
         this.state.playing = false;
-      } else {
+      } else if (this.state.url) {
+        // Only resume if there's a URL loaded
         this.mpv.resume();
         this.state.playing = true;
       }
@@ -158,10 +182,6 @@ export class AudioChannel {
     return this.state.error;
   }
   
-  clearError(): void {
-    this.state.error = null;
-  }
-  
   getURL(): string | null {
     return this.state.url;
   }
@@ -178,6 +198,27 @@ export class AudioChannel {
   
   getState(): ChannelState {
     return { ...this.state };
+  }
+  
+  getHistory(): HistoryEntry[] {
+    return [...this.state.history];
+  }
+  
+  addToHistory(entry: HistoryEntry): void {
+    if (!this.state.history.find(h => h.url === entry.url)) {
+      this.state.history.unshift(entry);
+      if (this.state.history.length > 10) {
+        this.state.history.pop();
+      }
+    }
+  }
+
+  setStateLock(locked: boolean): void {
+    this.lockState = locked;
+  }
+  
+  clearError(): void {
+    this.state.error = null;
   }
   
   async dispose(): Promise<void> {

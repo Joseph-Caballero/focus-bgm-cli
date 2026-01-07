@@ -48,14 +48,13 @@ export class App {
       tags: true,
       style: {
         fg: 'white',
-        bg: 'blue',
       },
       content: this.getHelpText(),
     });
   }
 
   private getHelpText(): string {
-    return ` {bold}p{/bold}:${HELP_TEXT.p}  {bold}←/→{/bold}:${HELP_TEXT.leftRight}  {bold}Tab{/bold}:${HELP_TEXT.tab}  {bold}1/2{/bold}:${HELP_TEXT.oneTwo}  {bold}v{/bold}:URL  {bold}q{/bold}:${HELP_TEXT.q} `;
+    return ` {bold}p{/bold}:${HELP_TEXT.p}  {bold}←/→{/bold}:${HELP_TEXT.leftRight}  {bold}Tab{/bold}:${HELP_TEXT.tab}  {bold}1/2{/bold}:${HELP_TEXT.oneTwo}  {bold}v{/bold}:URL  {bold}Alt+1-9{/bold}:History  {bold}q{/bold}:${HELP_TEXT.q} `;
   }
 
   private setupKeyHandler(): void {
@@ -67,6 +66,7 @@ export class App {
       onVolumeDown: () => this.adjustVolume(-CONSTANTS.VOLUME_STEP),
       onQuit: () => this.quit(),
       onEnterURL: () => this.enterURLMode(),
+      onPlayHistory: (index) => this.playHistory(index),
     };
 
     this.keyHandler = new KeyHandler(this.screen, callbacks);
@@ -113,6 +113,10 @@ export class App {
   }
 
   private async togglePause(): Promise<void> {
+    if (this.urlInput.isVisible()) {
+      return;
+    }
+    
     try {
       await this.channelManager.togglePause();
       this.updateUI();
@@ -136,6 +140,7 @@ export class App {
     }
 
     this.keyHandler.disable();
+    this.channelManager.lockState();
 
     const activeIndex = this.channelManager.getActiveChannelIndex();
 
@@ -156,12 +161,30 @@ export class App {
           this.updateUI();
         }
         this.keyHandler.enable();
+        this.channelManager.unlockState();
       },
       () => {
         this.keyHandler.enable();
+        this.channelManager.unlockState();
         this.updateUI();
       }
     );
+  }
+
+  private async playHistory(index: number): Promise<void> {
+    const activeIndex = this.channelManager.getActiveChannelIndex();
+    try {
+      const url = this.channelManager.playFromHistory(activeIndex, index);
+      if (url) {
+        await this.channelManager.playOnChannel(activeIndex, url);
+        this.updateUI();
+      }
+    } catch (error) {
+      this.panels[activeIndex].showError(
+        `Failed to play from history: ${error instanceof Error ? error.message : 'Unknown error'}`
+      );
+      this.updateUI();
+    }
   }
 
   private async quit(): Promise<void> {
