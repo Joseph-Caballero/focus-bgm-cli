@@ -1,7 +1,8 @@
 const mpv = require('node-mpv');
-import { ChannelState, ChannelIndex, HistoryEntry } from './types';
+import { ChannelState, ChannelIndex, HistoryEntry, LibraryEntry } from './types';
 import { getVideoTitle } from '../utils/youtube'; 
 import { HistoryDB } from '../utils/HistoryDB';
+import { DownloadManager } from './DownloadManager';
 
 export class AudioChannel {
   private mpv: any;
@@ -9,9 +10,12 @@ export class AudioChannel {
   private initialized: boolean = false;
   private lockState: boolean = false;
   private historyDB: HistoryDB | null = null;
+  private downloadManager: DownloadManager | null = null;
   
   constructor(channelId: ChannelIndex, historyDB?: HistoryDB) {
-    // Use unique socket path for each channel to prevent interference
+    this.historyDB = historyDB || null;
+    this.downloadManager = new DownloadManager(channelId);
+    
     const socketPath = channelId === 0 
       ? '/tmp/node-mpv-channel-0.sock'
       : '/tmp/node-mpv-channel-1.sock';
@@ -21,9 +25,8 @@ export class AudioChannel {
       debug: false,
       verbose: false,
       socket: socketPath,
+      loop_file: 'yes',
     });
-    
-    this.historyDB = historyDB || null;
     
     this.state = {
       id: channelId,
@@ -34,15 +37,26 @@ export class AudioChannel {
       loading: false,
       error: null,
       history: [],
+      downloading: false,
+      downloadProgress: 0,
+      loopEnabled: true,
+      library: [],
     };
     
     this.loadHistory();
+    this.loadLibrary();
     this.setupEventListeners();
   }
   
   private loadHistory(): void {
     if (this.historyDB) {
       this.state.history = this.historyDB.getHistory(this.state.id);
+    }
+  }
+  
+  private loadLibrary(): void {
+    if (this.historyDB) {
+      this.state.library = this.historyDB.getLibrary(this.state.id);
     }
   }
   
@@ -97,12 +111,27 @@ export class AudioChannel {
 
       const title = await getVideoTitle(url);
       
-      // Use "replace" mode - loads a single URL for this channel only
-      // Stop any current playback first to ensure clean state
+      const libraryEntry = this.state.library.find(e => e.url === url);
+      if (libraryEntry && this.downloadManager && this.downloadManager['getDownloadsDir']) {
+        const filePath = libraryEntry.filePath;
+        if (require('fs').existsSync(filePath)) {
+          try {
+            this.mpv.stop();
+          } catch (e) {
+          }
+          
+          this.state.url = url;
+          this.state.title = title;
+          this.addToHistory({ url, title });
+          
+          this.mpv.load(filePath, 'replace');
+          return;
+        }
+      }
+      
       try {
         this.mpv.stop();
       } catch (e) {
-        // Ignore stop errors if nothing was playing
       }
       
       this.state.url = url;
@@ -142,20 +171,15 @@ export class AudioChannel {
       try {
         this.mpv.stop();
       } catch (e) {
-        // Ignore stop errors
       }
       return;
     }
     
     try {
-      // Use explicit pause/resume to ensure this only affects this channel
       if (this.state.playing) {
-        this.mpv.pause();
-        this.state.playing = false;
+        await this.pause();
       } else if (this.state.url) {
-        // Only resume if there's a URL loaded
-        this.mpv.resume();
-        this.state.playing = true;
+        await this.resume();
       }
     } catch (error) {
       this.state.error = `Failed to toggle pause: ${error instanceof Error ? error.message : 'Unknown error'}`;
@@ -170,10 +194,6 @@ export class AudioChannel {
     } catch (error) {
       this.state.error = `Failed to set volume: ${error instanceof Error ? error.message : 'Unknown error'}`;
     }
-  }
-  
-  getVolume(): number {
-    return this.state.volume;
   }
   
   async adjustVolume(delta: number): Promise<void> {
@@ -195,6 +215,10 @@ export class AudioChannel {
   
   getURL(): string | null {
     return this.state.url;
+  }
+  
+  getTitle(): string | null {
+    return this.state.title;
   }
   
   async stop(): Promise<void> {
@@ -227,7 +251,142 @@ export class AudioChannel {
       }
     }
   }
-
+  
+  async startDownload(url: string, title: string): Promise<void> {
+    if (!this.downloadManager) {
+      return;
+    }
+    
+    if (this.state.downloading) {
+      throw new Error('Already downloading');
+    }
+    
+    if (this.historyDB && this.historyDB.isInLibrary(this.state.id, url)) {
+      throw new Error('Already in library');
+    }
+    
+    this.state.downloading = true;
+    this.state.downloadProgress = 0;
+    this.state.error = null;
+    
+    try {
+      const result = await this.downloadManager.download(url, title, (progress) => {
+        this.state.downloadProgress = progress;
+      });
+      
+      const libraryEntry: LibraryEntry = {
+        url: url,
+        title: title,
+        filePath: result.filePath,
+        fileSize: result.fileSize,
+        downloadedAt: Date.now(),
+      };
+      
+      this.state.library.unshift(libraryEntry);
+      
+      if (this.historyDB) {
+        this.historyDB.addToLibrary(this.state.id, libraryEntry);
+      }
+      
+      this.state.downloading = false;
+      this.state.downloadProgress = 0;
+    } catch (error) {
+      this.state.downloading = false;
+      this.state.downloadProgress = 0;
+      this.state.error = `Download failed: ${error instanceof Error ? error.message : 'Unknown error'}`;
+      throw error;
+    }
+  }
+  
+  cancelDownload(): void {
+    if (this.downloadManager && this.state.downloading) {
+      this.downloadManager.cancel();
+      this.state.downloading = false;
+      this.state.downloadProgress = 0;
+    }
+  }
+  
+  async restartPlayback(): Promise<void> {
+    try {
+      this.mpv.seek(0, 'absolute');
+    } catch (error) {
+      this.state.error = `Failed to restart: ${error instanceof Error ? error.message : 'Unknown error'}`;
+      throw error;
+    }
+  }
+  
+  toggleLoop(): void {
+    this.state.loopEnabled = !this.state.loopEnabled;
+    const loopValue = this.state.loopEnabled ? 'yes' : 'no';
+    try {
+      this.mpv.setOption('loop_file', loopValue);
+    } catch (error) {
+      console.error('Failed to toggle loop:', error);
+    }
+  }
+  
+  async playFromLibrary(index: number): Promise<void> {
+    if (index < 0 || index >= this.state.library.length) {
+      throw new Error('Invalid library index');
+    }
+    
+    const entry = this.state.library[index];
+    
+    if (!this.downloadManager) {
+      throw new Error('Download manager not initialized');
+    }
+    
+    const downloadsDir = this.downloadManager['getDownloadsDir']();
+    const filePath = entry.filePath;
+    
+    if (!require('fs').existsSync(filePath)) {
+      throw new Error('File not found on disk');
+    }
+    
+    this.state.url = entry.url;
+    this.state.title = entry.title;
+    this.state.loading = true;
+    this.state.error = null;
+    
+    try {
+      await this.mpv.load(filePath, 'replace');
+    } catch (error) {
+      this.state.loading = false;
+      this.state.error = `Failed to play: ${error instanceof Error ? error.message : 'Unknown error'}`;
+      throw error;
+    }
+  }
+  
+  removeFromLibrary(index: number): void {
+    if (index < 0 || index >= this.state.library.length) {
+      return;
+    }
+    
+    const entry = this.state.library[index];
+    
+    if (this.historyDB) {
+      this.historyDB.removeFromLibrary(this.state.id, entry.url);
+    }
+    
+    if (this.downloadManager && entry.filePath) {
+      this.downloadManager.deleteFile(entry.filePath);
+    }
+    
+    this.state.library.splice(index, 1);
+  }
+  
+  isDownloading(): boolean {
+    return this.state.downloading;
+  }
+  
+  getDownloadProgress(): number {
+    return this.state.downloadProgress;
+  }
+  
+  isLoopEnabled(): boolean {
+    return this.state.loopEnabled;
+  }
+  
   setStateLock(locked: boolean): void {
     this.lockState = locked;
   }

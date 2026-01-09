@@ -38,6 +38,13 @@ export function formatVolume(level: number): string {
   return `${filled}${empty}`;
 }
 
+export function formatProgress(progress: number): string {
+  const bars = Math.floor(progress / 5);
+  const filled = '█'.repeat(bars);
+  const empty = '░'.repeat(20 - bars);
+  return `${filled}${empty}`;
+}
+
 export function truncateURL(url: string | null, maxLength: number = 50): string {
   if (!url) return '(empty)';
   if (url.length <= maxLength) return url;
@@ -48,4 +55,19 @@ export function truncateText(text: string | null, maxLength: number = 50): strin
   if (!text) return '';
   if (text.length <= maxLength) return text;
   return text.substring(0, maxLength - 3) + '...';
+}
+
+export function sanitizeFilename(title: string): string {
+  const sanitized = title
+    .replace(/[<>:"/\\|?*]/g, '_')
+    .replace(/\s+/g, '_')
+    .substring(0, 200);
+  
+  return sanitized.length > 0 ? sanitized : 'audio';
+}
+
+export function formatFileSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes}B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)}KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)}MB`;
 }

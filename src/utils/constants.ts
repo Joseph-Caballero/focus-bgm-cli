@@ -19,12 +19,21 @@ export const KEY_BINDINGS = {
   ESCAPE: 'escape',
   BACKSPACE: 'backspace',
   DELETE: 'delete',
+  RESTART: 'r',
+  DOWNLOAD: 'd',
+  TOGGLE_LOOP: 'l',
+  PLAY_LIBRARY_BASE: 'S-1',
+  REMOVE_FROM_LIBRARY: 'C-x',
 } as const;
 
 export const HELP_TEXT = {
   p: 'Play/Pause',
+  r: 'Restart',
+  d: 'Download',
+  l: 'Loop',
   leftRight: 'Volume',
   tab: 'Switch',
   oneTwo: 'Select',
   q: 'Quit',
+  lib: 'Library',
 };

@@ -54,7 +54,7 @@ export class App {
   }
 
   private getHelpText(): string {
-    return ` {bold}p{/bold}:${HELP_TEXT.p}  {bold}←/→{/bold}:${HELP_TEXT.leftRight}  {bold}Tab{/bold}:${HELP_TEXT.tab}  {bold}1/2{/bold}:${HELP_TEXT.oneTwo}  {bold}v{/bold}:URL  {bold}Alt+1-9{/bold}:History  {bold}q{/bold}:${HELP_TEXT.q} `;
+    return ` {bold}p{/bold}:${HELP_TEXT.p}  {bold}r{/bold}:${HELP_TEXT.r}  {bold}d{/bold}:${HELP_TEXT.d}  {bold}l{/bold}:${HELP_TEXT.l}  {bold}←/→{/bold}:${HELP_TEXT.leftRight}  {bold}Tab{/bold}:${HELP_TEXT.tab}  {bold}Alt+1-9{/bold}:History  {bold}Shift+1-9{/bold}:${HELP_TEXT.lib}  {bold}Ctrl+X{/bold}:Delete  {bold}q{/bold}:${HELP_TEXT.q} `;
   }
 
   private setupKeyHandler(): void {
@@ -67,6 +67,11 @@ export class App {
       onQuit: () => this.quit(),
       onEnterURL: () => this.enterURLMode(),
       onPlayHistory: (index) => this.playHistory(index),
+      onRestart: () => this.restartPlayback(),
+      onDownload: () => this.downloadCurrent(),
+      onToggleLoop: () => this.toggleLoop(),
+      onPlayLibrary: (index) => this.playFromLibrary(index),
+      onRemoveFromLibrary: (index) => this.removeFromLibrary(index),
     };
 
     this.keyHandler = new KeyHandler(this.screen, callbacks);
@@ -197,5 +202,80 @@ export class App {
     await this.channelManager.cleanup();
     this.screen.destroy();
     process.exit(0);
+  }
+
+  private async restartPlayback(): Promise<void> {
+    try {
+      await this.channelManager.restartPlayback();
+      this.updateUI();
+    } catch (error) {
+      console.error('Failed to restart:', error);
+    }
+  }
+
+  private async downloadCurrent(): Promise<void> {
+    const activeIndex = this.channelManager.getActiveChannelIndex();
+    const channel = this.channelManager.getChannel(activeIndex);
+    const url = channel.getURL();
+    const title = channel.getTitle();
+    
+    if (!url || !title) {
+      this.panels[activeIndex].showError('No track playing');
+      this.updateUI();
+      return;
+    }
+    
+    try {
+      await this.channelManager.downloadCurrent(activeIndex);
+      this.updateUI();
+    } catch (error: any) {
+      if (error.message === 'Already in library') {
+        this.panels[activeIndex].showError('Track already in library - press Ctrl+X to remove');
+      } else {
+        this.panels[activeIndex].showError(
+          `Failed to download: ${error instanceof Error ? error.message : 'Unknown error'}`
+        );
+      }
+      this.updateUI();
+    }
+  }
+
+  private async toggleLoop(): Promise<void> {
+    try {
+      await this.channelManager.toggleLoop();
+      this.updateUI();
+    } catch (error) {
+      console.error('Failed to toggle loop:', error);
+    }
+  }
+
+  private async playFromLibrary(index: number): Promise<void> {
+    const activeIndex = this.channelManager.getActiveChannelIndex();
+    try {
+      await this.channelManager.playFromLibrary(activeIndex, index);
+      this.updateUI();
+    } catch (error) {
+      this.panels[activeIndex].showError(
+        `Failed to play from library: ${error instanceof Error ? error.message : 'Unknown error'}`
+      );
+      this.updateUI();
+    }
+  }
+
+  private async removeFromLibrary(index: number): Promise<void> {
+    const activeIndex = this.channelManager.getActiveChannelIndex();
+    const library = this.channelManager.getLibrary(activeIndex);
+    
+    if (index >= 0 && index < library.length) {
+      try {
+        await this.channelManager.removeFromLibrary(activeIndex, index);
+        this.updateUI();
+      } catch (error) {
+        this.panels[activeIndex].showError(
+          `Failed to remove from library: ${error instanceof Error ? error.message : 'Unknown error'}`
+        );
+        this.updateUI();
+      }
+    }
   }
 }

@@ -3,6 +3,14 @@ export interface HistoryEntry {
   title: string;
 }
 
+export interface LibraryEntry {
+  url: string;
+  title: string;
+  filePath: string;
+  fileSize: number;
+  downloadedAt: number;
+}
+
 export interface ChannelState {
   id: 0 | 1;
   url: string | null;
@@ -12,6 +20,10 @@ export interface ChannelState {
   loading: boolean;
   error: string | null;
   history: HistoryEntry[];
+  downloading: boolean;
+  downloadProgress: number;
+  loopEnabled: boolean;
+  library: LibraryEntry[];
 }
 
 export type ChannelIndex = 0 | 1;

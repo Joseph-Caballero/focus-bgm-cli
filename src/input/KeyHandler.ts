@@ -10,6 +10,11 @@ export interface KeyHandlerCallbacks {
   onQuit: () => void;
   onEnterURL: () => void;
   onPlayHistory: (index: number) => void;
+  onRestart: () => void;
+  onDownload: () => void;
+  onToggleLoop: () => void;
+  onPlayLibrary: (index: number) => void;
+  onRemoveFromLibrary: (index: number) => void;
 }
 
 export class KeyHandler {
@@ -87,6 +92,38 @@ export class KeyHandler {
         }
       });
     }
+
+    this.screen.key(['r'], () => {
+      if (this.enabled) {
+        this.callbacks.onRestart();
+      }
+    });
+
+    this.screen.key(['d'], () => {
+      if (this.enabled) {
+        this.callbacks.onDownload();
+      }
+    });
+
+    this.screen.key(['l'], () => {
+      if (this.enabled) {
+        this.callbacks.onToggleLoop();
+      }
+    });
+
+    for (let i = 1; i <= 9; i++) {
+      this.screen.key([String.fromCharCode(33 + i - 1)], () => {
+        if (this.enabled) {
+          this.callbacks.onPlayLibrary(i - 1);
+        }
+      });
+    }
+
+    this.screen.key(['C-x'], () => {
+      if (this.enabled) {
+        this.callbacks.onRemoveFromLibrary(0);
+      }
+    });
   }
 
   enable(): void {

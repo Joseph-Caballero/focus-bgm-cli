@@ -1,5 +1,5 @@
 import { AudioChannel } from './AudioChannel';
-import { ChannelState, ChannelIndex } from './types';
+import { ChannelState, ChannelIndex, LibraryEntry } from './types';
 import { HistoryDB } from '../utils/HistoryDB';
 
 export class ChannelManager {
@@ -90,5 +90,46 @@ export class ChannelManager {
   unlockState(): void {
     this.channels[0].setStateLock(false);
     this.channels[1].setStateLock(false);
+  }
+
+  async toggleLoop(index?: ChannelIndex): Promise<void> {
+    const targetIndex = index !== undefined ? index : this.activeChannelIndex;
+    this.channels[targetIndex].toggleLoop();
+  }
+
+  async restartPlayback(index?: ChannelIndex): Promise<void> {
+    const targetIndex = index !== undefined ? index : this.activeChannelIndex;
+    await this.channels[targetIndex].restartPlayback();
+  }
+
+  async downloadCurrent(index?: ChannelIndex): Promise<void> {
+    const targetIndex = index !== undefined ? index : this.activeChannelIndex;
+    const channel = this.channels[targetIndex];
+    const url = channel.getURL();
+    const title = channel.getTitle();
+    
+    if (url && title) {
+      await channel.startDownload(url, title);
+    }
+  }
+
+  async playFromLibrary(channelIndex: ChannelIndex, libraryIndex: number): Promise<void> {
+    await this.channels[channelIndex].playFromLibrary(libraryIndex);
+  }
+
+  async removeFromLibrary(channelIndex: ChannelIndex, libraryIndex: number): Promise<void> {
+    this.channels[channelIndex].removeFromLibrary(libraryIndex);
+  }
+
+  isDownloading(index: ChannelIndex): boolean {
+    return this.channels[index].isDownloading();
+  }
+
+  getDownloadProgress(index: ChannelIndex): number {
+    return this.channels[index].getDownloadProgress();
+  }
+
+  getLibrary(channelIndex: ChannelIndex): LibraryEntry[] {
+    return this.channels[channelIndex].getState().library;
   }
 }

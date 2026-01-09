@@ -12,7 +12,7 @@ export class URLInput {
       parent: screen,
       top: 'center',
       left: 'center',
-      width: '70%',
+      width: 100,
       height: 5 as any,
       border: { type: 'line' as any, fg: 'yellow' } as any,
       label: ' {bold}Paste YouTube URL{/bold} ',
@@ -28,6 +28,7 @@ export class URLInput {
       keys: true,
       vi: true,
       hidden: true,
+      scrollable: true,
     });
 
     this.setupEventListeners();

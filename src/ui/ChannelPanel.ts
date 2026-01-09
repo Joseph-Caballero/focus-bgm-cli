@@ -1,7 +1,7 @@
 import * as blessed from 'blessed';
 import { ChannelState } from '../audio/types';
 import { UI_STYLES } from './styles';
-import { truncateURL, truncateText, formatVolume } from '../utils/youtube';
+import { truncateURL, truncateText, formatVolume, formatProgress } from '../utils/youtube';
 
 const STATUS_BAR_HEIGHT = 3;
 
@@ -35,6 +35,10 @@ export class ChannelPanel {
       loading: false,
       error: null,
       history: [],
+      downloading: false,
+      downloadProgress: 0,
+      loopEnabled: true,
+      library: [],
     });
   }
 
@@ -57,7 +61,15 @@ export class ChannelPanel {
 
     content += `{bold}${UI_STYLES.ICONS.ACTIVE} Channel ${this.channelId + 1}{/bold}\n\n`;
     
-    if (state.error) {
+    if (state.loopEnabled) {
+      content += `{green-fg}[LOOP ON]{/green-fg} `;
+    }
+    
+    if (state.downloading) {
+      content += `{yellow-fg}[DOWNLOADING ${state.downloadProgress}%]{/yellow-fg}\n`;
+      const progress = formatProgress(state.downloadProgress);
+      content += `${progress}\n\n`;
+    } else if (state.error) {
       content += `{${UI_STYLES.COLORS.ERROR}-fg}Error: ${state.error}{/${UI_STYLES.COLORS.ERROR}-fg}\n\n`;
     } else if (state.loading) {
       content += `{${UI_STYLES.COLORS.WARNING}-fg}${UI_STYLES.ICONS.LOADING} Loading...{/${UI_STYLES.COLORS.WARNING}-fg}\n\n`;
@@ -83,9 +95,25 @@ export class ChannelPanel {
         const shortTitle = truncateText(entry.title, 35);
         content += `  ${index + 1}. {cyan-fg}${shortTitle}{/cyan-fg}\n`;
       });
+      content += '\n';
+    }
+    
+    if (state.library.length > 0) {
+      content += `{bold}Library:{/bold}\n`;
+      state.library.forEach((entry, index) => {
+        const sizeStr = this.formatFileSize(entry.fileSize);
+        const shortTitle = truncateText(entry.title, 35);
+        content += `  {cyan-fg}[OFFLINE]{/cyan-fg} ${index + 1}. ${shortTitle} (${sizeStr})\n`;
+      });
     }
 
     this.box.setContent(content);
+  }
+  
+  private formatFileSize(bytes: number): string {
+    if (bytes < 1024) return `${bytes}B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)}KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(1)}MB`;
   }
 
   private getIcon(state: ChannelState): string {
