@@ -1,14 +1,17 @@
 import { AudioChannel } from './AudioChannel';
 import { ChannelState, ChannelIndex } from './types';
+import { HistoryDB } from '../utils/HistoryDB';
 
 export class ChannelManager {
   private channels: [AudioChannel, AudioChannel];
   private activeChannelIndex: ChannelIndex = 0;
+  private historyDB: HistoryDB;
 
   constructor() {
+    this.historyDB = new HistoryDB();
     this.channels = [
-      new AudioChannel(0),
-      new AudioChannel(1),
+      new AudioChannel(0, this.historyDB),
+      new AudioChannel(1, this.historyDB),
     ];
   }
 
@@ -76,6 +79,7 @@ export class ChannelManager {
       this.channels[0].dispose(),
       this.channels[1].dispose(),
     ]);
+    this.historyDB.close();
   }
 
   lockState(): void {

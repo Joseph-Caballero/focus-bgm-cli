@@ -23,6 +23,8 @@
   "author": "",
   "license": "MIT",
   "dependencies": {
+    "@types/better-sqlite3": "^7.6.13",
+    "better-sqlite3": "^12.5.0",
     "blessed": "^0.1.81",
     "node-mpv": "^1.5.0"
   },

@@ -1,14 +1,16 @@
 const mpv = require('node-mpv');
 import { ChannelState, ChannelIndex, HistoryEntry } from './types';
 import { getVideoTitle } from '../utils/youtube'; 
+import { HistoryDB } from '../utils/HistoryDB';
 
 export class AudioChannel {
   private mpv: any;
   private state: ChannelState;
   private initialized: boolean = false;
   private lockState: boolean = false;
+  private historyDB: HistoryDB | null = null;
   
-  constructor(channelId: ChannelIndex) {
+  constructor(channelId: ChannelIndex, historyDB?: HistoryDB) {
     // Use unique socket path for each channel to prevent interference
     const socketPath = channelId === 0 
       ? '/tmp/node-mpv-channel-0.sock'
@@ -21,6 +23,8 @@ export class AudioChannel {
       socket: socketPath,
     });
     
+    this.historyDB = historyDB || null;
+    
     this.state = {
       id: channelId,
       url: null,
@@ -32,7 +36,14 @@ export class AudioChannel {
       history: [],
     };
     
+    this.loadHistory();
     this.setupEventListeners();
+  }
+  
+  private loadHistory(): void {
+    if (this.historyDB) {
+      this.state.history = this.historyDB.getHistory(this.state.id);
+    }
   }
   
   private setupEventListeners(): void {
@@ -209,6 +220,10 @@ export class AudioChannel {
       this.state.history.unshift(entry);
       if (this.state.history.length > 10) {
         this.state.history.pop();
+      }
+      
+      if (this.historyDB) {
+        this.historyDB.addEntry(this.state.id, entry);
       }
     }
   }

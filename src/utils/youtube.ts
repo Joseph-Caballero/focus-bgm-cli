@@ -32,9 +32,9 @@ export async function getVideoTitle(url: string): Promise<string> {
 }
 
 export function formatVolume(level: number): string {
-  const bars = Math.floor(level / 10);
+  const bars = Math.floor(level / 5);
   const filled = '█'.repeat(bars);
-  const empty = '░'.repeat(10 - bars);
+  const empty = '░'.repeat(20 - bars);
   return `${filled}${empty}`;
 }
 
