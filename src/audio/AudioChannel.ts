@@ -1,6 +1,7 @@
 const mpv = require('node-mpv');
+import * as path from 'path';
 import { ChannelState, ChannelIndex, HistoryEntry, LibraryEntry } from './types';
-import { getVideoTitle } from '../utils/youtube'; 
+import { getVideoTitle, getStreamURL } from '../utils/youtube'; 
 import { HistoryDB } from '../utils/HistoryDB';
 import { DownloadManager } from './DownloadManager';
 
@@ -27,8 +28,19 @@ export class AudioChannel {
         verbose: false,
         socket: socketPath,
         loop_file: 'yes',
+        binary: path.resolve(__dirname, '..', '..', 'bin', 'mpv-silent'),
       },
-      ['--input-terminal=no', '--input-default-bindings=no', '--input-conf=/dev/null']
+      [
+        '--input-terminal=no',
+        '--input-default-bindings=no',
+        '--input-conf=/dev/null',
+        '--no-terminal',
+        '--term-osd=no',
+        '--term-osd-bar=no',
+        '--term-playing-msg=',
+        '--term-status-msg=',
+        '--msg-level=all=no',
+      ]
     );
     
     this.state = {
@@ -114,6 +126,7 @@ export class AudioChannel {
       } 
 
       const title = await getVideoTitle(url);
+      const streamUrl = await getStreamURL(url);
       
       const libraryEntry = this.state.library.find(e => e.url === url);
       if (libraryEntry && this.downloadManager && this.downloadManager['getDownloadsDir']) {
@@ -142,7 +155,7 @@ export class AudioChannel {
       this.state.title = title;
       this.addToHistory({ url, title });
       
-      this.mpv.load(url, 'replace');
+      this.mpv.load(streamUrl, 'replace');
     } catch (error) {
       this.state.loading = false;
       this.state.error = `Failed to play URL: ${error instanceof Error ? error.message : 'Unknown error'}`;

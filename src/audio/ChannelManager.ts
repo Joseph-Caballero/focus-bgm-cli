@@ -1,6 +1,7 @@
 import { AudioChannel } from './AudioChannel';
 import { ChannelState, ChannelIndex, LibraryEntry } from './types';
 import { HistoryDB } from '../utils/HistoryDB';
+import { stripStartTimeParam } from '../utils/youtube';
 
 export class ChannelManager {
   private channels: [AudioChannel, AudioChannel];
@@ -62,7 +63,8 @@ export class ChannelManager {
   }
 
   async playOnChannel(index: ChannelIndex, url: string): Promise<void> {
-    await this.channels[index].play(url);
+    const sanitizedUrl = stripStartTimeParam(url);
+    await this.channels[index].play(sanitizedUrl);
     this.channels[index].clearError();
   }
 

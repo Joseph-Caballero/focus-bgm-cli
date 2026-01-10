@@ -8,8 +8,9 @@ const STATUS_BAR_HEIGHT = 3;
 export class ChannelPanel {
   private box: blessed.Widgets.BoxElement;
   private channelId: number;
+  private headerScrubX: number | null = null;
 
-  constructor(channelId: number, parent: blessed.Widgets.Screen) {
+  constructor(channelId: number, parent: blessed.Widgets.Node) {
     this.channelId = channelId;
     
     this.box = blessed.box({
@@ -52,7 +53,6 @@ export class ChannelPanel {
   }
 
   private updateContent(state: ChannelState): void {
-    const icon = this.getIcon(state);
     const statusText = this.getStatusText(state);
     const volumeBar = formatVolume(state.volume);
     const urlDisplay = truncateURL(state.url, 100);
@@ -60,36 +60,37 @@ export class ChannelPanel {
     
     let content = '';
 
-    content += `{bold}${UI_STYLES.ICONS.ACTIVE} Channel ${this.channelId + 1}{/bold}\n\n`;
-    
-    if (state.downloading) {
-      content += `{yellow-fg}[DOWNLOADING ${state.downloadProgress}%]{/yellow-fg}\n`;
-      const progress = formatProgress(state.downloadProgress);
-      content += `${progress}\n\n`;
-    } else if (state.error) {
-      content += `{${UI_STYLES.COLORS.ERROR}-fg}Error: ${state.error}{/${UI_STYLES.COLORS.ERROR}-fg}\n\n`;
-    } else if (state.loading) {
-      content += `{${UI_STYLES.COLORS.WARNING}-fg}${UI_STYLES.ICONS.LOADING} Loading...{/${UI_STYLES.COLORS.WARNING}-fg}\n\n`;
-    }
-    
     const shouldShowLoopIndicator =
       state.loopEnabled &&
       state.loopIndicatorUntil !== null &&
       Date.now() < state.loopIndicatorUntil &&
       state.playing;
     const loopIndicator = shouldShowLoopIndicator ? ' {green-fg}[LOOP ON]{/green-fg}' : '';
-    content += `${icon} ${statusText}${loopIndicator}\n\n`;
-    
-    if (state.playing && state.title) {
-      content += `Title: {cyan-fg}${titleDisplay}{/cyan-fg}\n\n`;
+    const headerLeft = `{bold}${UI_STYLES.ICONS.ACTIVE} Channel ${this.channelId + 1}{/bold}`;
+    const headerCenter = `${statusText}${loopIndicator}`;
+    content += `${this.buildHeaderLine(headerLeft, headerCenter)}\n\n`;
+
+    if (state.error) {
+      content += `{${UI_STYLES.COLORS.ERROR}-fg}Error: ${state.error}{/${UI_STYLES.COLORS.ERROR}-fg}\n\n`;
+    } else if (state.loading) {
+      content += `{${UI_STYLES.COLORS.WARNING}-fg}${UI_STYLES.ICONS.LOADING} Loading...{/${UI_STYLES.COLORS.WARNING}-fg}\n\n`;
     }
+
+    const titleLine = state.title ? `{cyan-fg}${titleDisplay}{/cyan-fg}` : '';
+    content += `${titleLine}\n\n`;
     
     if (state.url) {
-      content += `URL: {cyan-fg}${urlDisplay}{/cyan-fg}\n\n`;
+      content += `{cyan-fg}${urlDisplay}{/cyan-fg}\n\n`;
     } else {
-      content += `URL: {gray-fg}(empty - paste YouTube URL){/gray-fg}\n\n`;
+      content += `\n\n`;
     }
     
+    if (state.downloading) {
+      content += `{yellow-fg}[DOWNLOADING ${state.downloadProgress}%]{/yellow-fg}\n`;
+      const progress = formatProgress(state.downloadProgress);
+      content += `${progress}\n\n`;
+    }
+
     content += `Volume: {green-fg}${volumeBar}{/green-fg} ${state.volume}%\n\n`;
     
     if (state.history.length > 0) {
@@ -104,23 +105,73 @@ export class ChannelPanel {
       content += `{bold}Library:{/bold}\n`;
       state.library.forEach((entry, index) => {
         const sizeStr = this.formatFileSize(entry.fileSize);
-        content += `  {cyan-fg}[OFFLINE]{/cyan-fg} ${index + 1}. ${entry.title} (${sizeStr})\n`;
+        content += `  ${index + 1}. ${entry.title} (${sizeStr})\n`;
       });
     }
 
     this.box.setContent(content);
   }
   
+  private buildHeaderLine(left: string, center: string): string {
+    const width = this.getInnerWidth();
+    if (width <= 0) {
+      return `${left} ${center}`;
+    }
+
+    const leftLen = this.visibleLength(left);
+    const centerLen = this.visibleLength(center);
+    const rawCenterStart = Math.floor((width - centerLen) / 2);
+    const centerStart = Math.max(rawCenterStart, leftLen + 1);
+    const gap = Math.max(1, centerStart - leftLen);
+    const line = left + ' '.repeat(gap) + center;
+    this.headerScrubX = Math.min(width - 1, centerStart + centerLen);
+    return this.padLine(line, width);
+  }
+
+  private getInnerWidth(): number {
+    if (typeof this.box.width !== 'number') {
+      return 0;
+    }
+    return Math.max(0, this.box.width - 2);
+  }
+
+  private padLine(line: string, width: number): string {
+    const visible = this.visibleLength(line);
+    if (visible >= width) {
+      return line;
+    }
+    return line + ' '.repeat(width - visible);
+  }
+
+  private visibleLength(text: string): number {
+    const box = this.box as any;
+    if (box && typeof box.strWidth === 'function') {
+      return box.strWidth(text);
+    }
+    return this.stripTags(text).length;
+  }
+
+  private stripTags(text: string): string {
+    return text.replace(/\{[^}]+\}/g, '');
+  }
+
+  getHeaderScrubPosition(): { x: number; y: number } | null {
+    if (this.headerScrubX === null) {
+      return null;
+    }
+    const coords = (this.box as any)._getCoords?.();
+    if (!coords) {
+      return null;
+    }
+    const x = coords.xi + (this.box.ileft || 0) + this.headerScrubX;
+    const y = coords.yi + (this.box.itop || 0);
+    return { x, y };
+  }
+
   private formatFileSize(bytes: number): string {
     if (bytes < 1024) return `${bytes}B`;
     if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)}KB`;
     return `${(bytes / (1024 * 1024)).toFixed(1)}MB`;
-  }
-
-  private getIcon(state: ChannelState): string {
-    if (state.loading) return UI_STYLES.ICONS.LOADING;
-    if (state.playing) return UI_STYLES.ICONS.PLAYING;
-    return UI_STYLES.ICONS.PAUSED;
   }
 
   private getStatusText(state: ChannelState): string {

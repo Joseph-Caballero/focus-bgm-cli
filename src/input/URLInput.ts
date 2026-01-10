@@ -65,6 +65,12 @@ export class URLInput {
     this.box.show();
     this.box.setValue('');
     this.box.focus();
+    const program = this.box.screen.program as any;
+    if (program?._originalShowCursor) {
+      program._originalShowCursor();
+    } else {
+      this.box.screen.program.showCursor();
+    }
     this.box.screen.render();
   }
 
@@ -72,6 +78,7 @@ export class URLInput {
     this.visible = false;
     this.box.hide();
     this.box.clearValue();
+    this.box.screen.program.hideCursor();
   }
 
   getValue(): string {
