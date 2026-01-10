@@ -36,4 +36,5 @@ export const HELP_TEXT = {
   oneTwo: 'Select',
   q: 'Quit',
   lib: 'Library',
+  clear: 'Clear History',
 };

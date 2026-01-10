@@ -1,7 +1,7 @@
 import * as blessed from 'blessed';
 import { ChannelState } from '../audio/types';
 import { UI_STYLES } from './styles';
-import { truncateURL, truncateText, formatVolume, formatProgress } from '../utils/youtube';
+import { truncateURL, formatVolume, formatProgress } from '../utils/youtube';
 
 const STATUS_BAR_HEIGHT = 3;
 
@@ -14,10 +14,10 @@ export class ChannelPanel {
     
     this.box = blessed.box({
       parent,
-      top: 0,
-      bottom: STATUS_BAR_HEIGHT,
-      width: '50%',
-      left: channelId === 0 ? 0 : '50%',
+      left: 0,
+      right: 0,
+      height: '50%',
+      top: channelId === 0 ? 0 : '50%',
       tags: true,
       border: { type: 'line' as any, fg: 'blue' } as any,
       style: {
@@ -38,6 +38,7 @@ export class ChannelPanel {
       downloading: false,
       downloadProgress: 0,
       loopEnabled: true,
+      loopIndicatorUntil: null,
       library: [],
     });
   }
@@ -54,16 +55,12 @@ export class ChannelPanel {
     const icon = this.getIcon(state);
     const statusText = this.getStatusText(state);
     const volumeBar = formatVolume(state.volume);
-    const urlDisplay = truncateURL(state.url, 45);
-    const titleDisplay = truncateText(state.title, 45);
+    const urlDisplay = truncateURL(state.url, 100);
+    const titleDisplay = state.title ?? '';
     
     let content = '';
 
     content += `{bold}${UI_STYLES.ICONS.ACTIVE} Channel ${this.channelId + 1}{/bold}\n\n`;
-    
-    if (state.loopEnabled) {
-      content += `{green-fg}[LOOP ON]{/green-fg} `;
-    }
     
     if (state.downloading) {
       content += `{yellow-fg}[DOWNLOADING ${state.downloadProgress}%]{/yellow-fg}\n`;
@@ -75,7 +72,13 @@ export class ChannelPanel {
       content += `{${UI_STYLES.COLORS.WARNING}-fg}${UI_STYLES.ICONS.LOADING} Loading...{/${UI_STYLES.COLORS.WARNING}-fg}\n\n`;
     }
     
-    content += `${icon} ${statusText}\n\n`;
+    const shouldShowLoopIndicator =
+      state.loopEnabled &&
+      state.loopIndicatorUntil !== null &&
+      Date.now() < state.loopIndicatorUntil &&
+      state.playing;
+    const loopIndicator = shouldShowLoopIndicator ? ' {green-fg}[LOOP ON]{/green-fg}' : '';
+    content += `${icon} ${statusText}${loopIndicator}\n\n`;
     
     if (state.playing && state.title) {
       content += `Title: {cyan-fg}${titleDisplay}{/cyan-fg}\n\n`;
@@ -92,8 +95,7 @@ export class ChannelPanel {
     if (state.history.length > 0) {
       content += `{bold}History:{/bold}\n`;
       state.history.forEach((entry, index) => {
-        const shortTitle = truncateText(entry.title, 35);
-        content += `  ${index + 1}. {cyan-fg}${shortTitle}{/cyan-fg}\n`;
+        content += `  ${index + 1}. {cyan-fg}${entry.title}{/cyan-fg}\n`;
       });
       content += '\n';
     }
@@ -102,8 +104,7 @@ export class ChannelPanel {
       content += `{bold}Library:{/bold}\n`;
       state.library.forEach((entry, index) => {
         const sizeStr = this.formatFileSize(entry.fileSize);
-        const shortTitle = truncateText(entry.title, 35);
-        content += `  {cyan-fg}[OFFLINE]{/cyan-fg} ${index + 1}. ${shortTitle} (${sizeStr})\n`;
+        content += `  {cyan-fg}[OFFLINE]{/cyan-fg} ${index + 1}. ${entry.title} (${sizeStr})\n`;
       });
     }
 

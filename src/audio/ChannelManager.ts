@@ -132,4 +132,8 @@ export class ChannelManager {
   getLibrary(channelIndex: ChannelIndex): LibraryEntry[] {
     return this.channels[channelIndex].getState().library;
   }
+
+  clearHistory(channelIndex: ChannelIndex): void {
+    this.channels[channelIndex].clearHistory();
+  }
 }

@@ -54,7 +54,7 @@ export class App {
   }
 
   private getHelpText(): string {
-    return ` {bold}p{/bold}:${HELP_TEXT.p}  {bold}r{/bold}:${HELP_TEXT.r}  {bold}d{/bold}:${HELP_TEXT.d}  {bold}l{/bold}:${HELP_TEXT.l}  {bold}←/→{/bold}:${HELP_TEXT.leftRight}  {bold}Tab{/bold}:${HELP_TEXT.tab}  {bold}Alt+1-9{/bold}:History  {bold}Shift+1-9{/bold}:${HELP_TEXT.lib}  {bold}Ctrl+X{/bold}:Delete  {bold}q{/bold}:${HELP_TEXT.q} `;
+    return ` {bold}p{/bold}:${HELP_TEXT.p}  {bold}r{/bold}:${HELP_TEXT.r}  {bold}d{/bold}:${HELP_TEXT.d}  {bold}l{/bold}:${HELP_TEXT.l}  {bold}←/→{/bold}:${HELP_TEXT.leftRight}  {bold}Tab{/bold}:${HELP_TEXT.tab}  {bold}Alt+1-9{/bold}:History  {bold}Shift+1-9{/bold}:${HELP_TEXT.lib}  {bold}Alt+C{/bold}:${HELP_TEXT.clear}  {bold}Ctrl+X{/bold}:Delete  {bold}q{/bold}:${HELP_TEXT.q} `;
   }
 
   private setupKeyHandler(): void {
@@ -72,6 +72,7 @@ export class App {
       onToggleLoop: () => this.toggleLoop(),
       onPlayLibrary: (index) => this.playFromLibrary(index),
       onRemoveFromLibrary: (index) => this.removeFromLibrary(index),
+      onClearHistory: () => this.clearHistory(),
     };
 
     this.keyHandler = new KeyHandler(this.screen, callbacks);
@@ -276,6 +277,19 @@ export class App {
         );
         this.updateUI();
       }
+    }
+  }
+
+  private async clearHistory(): Promise<void> {
+    const activeIndex = this.channelManager.getActiveChannelIndex();
+    try {
+      await this.channelManager.clearHistory(activeIndex);
+      this.updateUI();
+    } catch (error) {
+      this.panels[activeIndex].showError(
+        `Failed to clear history: ${error instanceof Error ? error.message : 'Unknown error'}`
+      );
+      this.updateUI();
     }
   }
 }

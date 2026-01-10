@@ -20,13 +20,16 @@ export class AudioChannel {
       ? '/tmp/node-mpv-channel-0.sock'
       : '/tmp/node-mpv-channel-1.sock';
     
-    this.mpv = new (mpv as any)({
-      audio_only: true,
-      debug: false,
-      verbose: false,
-      socket: socketPath,
-      loop_file: 'yes',
-    });
+    this.mpv = new (mpv as any)(
+      {
+        audio_only: true,
+        debug: false,
+        verbose: false,
+        socket: socketPath,
+        loop_file: 'yes',
+      },
+      ['--input-terminal=no', '--input-default-bindings=no', '--input-conf=/dev/null']
+    );
     
     this.state = {
       id: channelId,
@@ -40,6 +43,7 @@ export class AudioChannel {
       downloading: false,
       downloadProgress: 0,
       loopEnabled: true,
+      loopIndicatorUntil: null,
       library: [],
     };
     
@@ -239,6 +243,13 @@ export class AudioChannel {
     return [...this.state.history];
   }
   
+  clearHistory(): void {
+    this.state.history = [];
+    if (this.historyDB) {
+      this.historyDB.clearHistory(this.state.id);
+    }
+  }
+  
   addToHistory(entry: HistoryEntry): void {
     if (!this.state.history.find(h => h.url === entry.url)) {
       this.state.history.unshift(entry);
@@ -308,7 +319,7 @@ export class AudioChannel {
   
   async restartPlayback(): Promise<void> {
     try {
-      this.mpv.seek(0, 'absolute');
+      this.mpv.goToPosition(0);
     } catch (error) {
       this.state.error = `Failed to restart: ${error instanceof Error ? error.message : 'Unknown error'}`;
       throw error;
@@ -317,9 +328,14 @@ export class AudioChannel {
   
   toggleLoop(): void {
     this.state.loopEnabled = !this.state.loopEnabled;
-    const loopValue = this.state.loopEnabled ? 'yes' : 'no';
     try {
-      this.mpv.setOption('loop_file', loopValue);
+      if (this.state.loopEnabled) {
+        this.mpv.loop();
+        this.state.loopIndicatorUntil = Date.now() + 3000;
+      } else {
+        this.mpv.clearLoop();
+        this.state.loopIndicatorUntil = null;
+      }
     } catch (error) {
       console.error('Failed to toggle loop:', error);
     }

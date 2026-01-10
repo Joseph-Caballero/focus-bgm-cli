@@ -23,6 +23,7 @@ export interface ChannelState {
   downloading: boolean;
   downloadProgress: number;
   loopEnabled: boolean;
+  loopIndicatorUntil: number | null;
   library: LibraryEntry[];
 }
 

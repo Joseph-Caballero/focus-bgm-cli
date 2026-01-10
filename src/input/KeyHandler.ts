@@ -15,6 +15,7 @@ export interface KeyHandlerCallbacks {
   onToggleLoop: () => void;
   onPlayLibrary: (index: number) => void;
   onRemoveFromLibrary: (index: number) => void;
+  onClearHistory: () => void;
 }
 
 export class KeyHandler {
@@ -108,6 +109,12 @@ export class KeyHandler {
     this.screen.key(['l'], () => {
       if (this.enabled) {
         this.callbacks.onToggleLoop();
+      }
+    });
+
+    this.screen.key(['M-c'], () => {
+      if (this.enabled) {
+        this.callbacks.onClearHistory();
       }
     });
 
