@@ -9,7 +9,7 @@ export const CONSTANTS = {
 export const KEY_BINDINGS = {
   CHANNEL_1: '1',
   CHANNEL_2: '2',
-  TAB: 'TAB',
+  TAB: 'tab',
   TOGGLE_PAUSE: 'p',
   VOLUME_UP: 'right',
   VOLUME_DOWN: 'left',
