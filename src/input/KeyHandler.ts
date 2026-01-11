@@ -118,8 +118,9 @@ export class KeyHandler {
       }
     });
 
+    const shiftNumberKeys = ['!', '@', '#', '$', '%', '^', '&', '*', '(', ')'];
     for (let i = 1; i <= 9; i++) {
-      this.screen.key([String.fromCharCode(33 + i - 1)], () => {
+      this.screen.key([shiftNumberKeys[i - 1]], () => {
         if (this.enabled) {
           this.callbacks.onPlayLibrary(i - 1);
         }
