@@ -2,6 +2,8 @@
 
 Terminal audio player for YouTube with two independent channels. Stream, pause, loop, and download tracks per channel with a simple TUI.
 
+![Focus BGM CLI UI](assets/ui.png)
+
 ## Features
 
 - Dual-channel playback with independent volume and pause
