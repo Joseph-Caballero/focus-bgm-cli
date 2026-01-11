@@ -36,11 +36,7 @@ function silenceMpvSpawnOutput(): void {
       } else {
         nextOptions.stdio = 'ignore';
       }
-      nextOptions.detached = true;
       const child = originalSpawn(command, args, nextOptions);
-      if (typeof child.unref === 'function') {
-        child.unref();
-      }
       return child;
     }
     return originalSpawn(command, args, options);
