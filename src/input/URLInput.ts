@@ -1,5 +1,6 @@
 import * as blessed from 'blessed';
 import { isValidYouTubeURL } from '../utils/youtube';
+import { ExtendedBlessedProgram, ExtendedBorder } from '../types/blessed-extended';
 
 export class URLInput {
   private box: blessed.Widgets.TextareaElement;
@@ -13,8 +14,8 @@ export class URLInput {
       top: 'center',
       left: 'center',
       width: 100,
-      height: 5 as any,
-      border: { type: 'line' as any, fg: 'yellow' } as any,
+      height: 5,
+      border: { type: 'line', fg: 'yellow' } as ExtendedBorder as blessed.Widgets.Border,
       label: ' {bold}Paste YouTube URL{/bold} ',
       tags: true,
       style: {
@@ -65,8 +66,8 @@ export class URLInput {
     this.box.show();
     this.box.setValue('');
     this.box.focus();
-    const program = this.box.screen.program as any;
-    if (program?._originalShowCursor) {
+    const program = this.box.screen.program as ExtendedBlessedProgram;
+    if (program._originalShowCursor) {
       program._originalShowCursor();
     } else {
       this.box.screen.program.showCursor();

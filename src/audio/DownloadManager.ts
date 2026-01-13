@@ -75,7 +75,7 @@ export class DownloadManager {
         reject(new Error(`Download error: ${error.message}`));
       });
 
-      subprocess.on('exit', (code: number | null, signal: any) => {
+      subprocess.on('exit', (code: number | null, _signal: NodeJS.Signals | null) => {
         clearInterval(progressUpdateInterval);
         
         if (code === 0) {
@@ -112,7 +112,7 @@ export class DownloadManager {
     });
   }
 
-  private parseProgressFromStderr(stderr: any): number | null {
+  private parseProgressFromStderr(stderr: string | Buffer | null): number | null {
     if (!stderr) return null;
     
     const stderrStr = stderr.toString();

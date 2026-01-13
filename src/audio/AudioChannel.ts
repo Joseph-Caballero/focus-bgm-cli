@@ -1,4 +1,4 @@
-const mpv = require('node-mpv');
+import MPV = require('node-mpv');
 import * as path from 'path';
 import { ChannelState, ChannelIndex, HistoryEntry, LibraryEntry } from './types';
 import { getVideoTitle, getStreamURL } from '../utils/youtube'; 
@@ -6,7 +6,7 @@ import { HistoryDB } from '../utils/HistoryDB';
 import { DownloadManager } from './DownloadManager';
 
 export class AudioChannel {
-  private mpv: any;
+  private mpv: MPV;
   private state: ChannelState;
   private initialized: boolean = false;
   private lockState: boolean = false;
@@ -21,7 +21,7 @@ export class AudioChannel {
       ? '/tmp/node-mpv-channel-0.sock'
       : '/tmp/node-mpv-channel-1.sock';
     
-    this.mpv = new (mpv as any)(
+    this.mpv = new MPV(
       {
         audio_only: true,
         debug: false,
@@ -102,9 +102,9 @@ export class AudioChannel {
       this.state.loading = false;
     });
     
-    this.mpv.on('error', (error: any) => {
+    this.mpv.on('error', (error: Error) => {
       if (this.lockState) return;
-      this.state.error = error instanceof Error ? error.message : String(error);
+      this.state.error = error.message;
       this.state.playing = false;
       this.state.loading = false;
     });

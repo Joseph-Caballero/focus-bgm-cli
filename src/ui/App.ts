@@ -5,6 +5,7 @@ import { URLInput } from '../input/URLInput';
 import { KeyHandler, KeyHandlerCallbacks } from '../input/KeyHandler';
 import { CONSTANTS, HELP_TEXT } from '../utils/constants';
 import { isValidYouTubeURL } from '../utils/youtube';
+import { ExtendedBlessedProgram, ScreenWithCursorOverride } from '../types/blessed-extended';
 
 export class App {
   private screen: blessed.Widgets.Screen;
@@ -32,11 +33,11 @@ export class App {
         color: 'default',
       },
     });
-    (this.screen as any).cursor.shape = { ch: ' ' };
-    const program = this.screen.program as any;
+    (this.screen as unknown as ScreenWithCursorOverride).cursor.shape = { ch: ' ' };
+    const program = this.screen.program as ExtendedBlessedProgram;
     if (program && typeof program.showCursor === 'function') {
       program._originalShowCursor = program.showCursor.bind(program);
-      program.showCursor = () => {};
+      program.showCursor = () => true;
     }
     this.screen.program.hideCursor();
 
@@ -159,7 +160,7 @@ export class App {
   }
 
   private scrubHeaderArtifacts(): void {
-    const program = this.screen.program as any;
+    const program = this.screen.program as ExtendedBlessedProgram;
     const panels = [this.panels[0], this.panels[1]];
     panels.forEach((panel) => {
       const pos = panel.getHeaderScrubPosition();
@@ -291,8 +292,8 @@ export class App {
     try {
       await this.channelManager.downloadCurrent(activeIndex);
       this.updateUI();
-    } catch (error: any) {
-      if (error.message === 'Already in library') {
+    } catch (error) {
+      if (error instanceof Error && error.message === 'Already in library') {
         this.panels[activeIndex].showError('Track already in library - press Ctrl+X to remove');
       } else {
         this.panels[activeIndex].showError(

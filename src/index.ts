@@ -1,17 +1,38 @@
+type WriteCallback = (err?: Error | null) => void;
+type WriteFn = (
+  chunk: string | Uint8Array,
+  encodingOrCallback?: BufferEncoding | WriteCallback,
+  callback?: WriteCallback
+) => boolean;
+
 function suppressStrayDots(): void {
-  const wrapWrite = (writeFn: typeof process.stdout.write) => {
-    return ((chunk: any, ...args: any[]) => {
+  const wrapWrite = (writeFn: WriteFn): typeof process.stdout.write => {
+    return function(
+      this: NodeJS.WriteStream,
+      chunk: string | Uint8Array,
+      encodingOrCallback?: BufferEncoding | WriteCallback,
+      callback?: WriteCallback
+    ): boolean {
       const text = typeof chunk === 'string' ? chunk : chunk?.toString?.() ?? '';
       const stripped = text.replace(/[\r\n\s]/g, '');
       if (stripped === '.') {
+        if (typeof encodingOrCallback === 'function') {
+          encodingOrCallback(null);
+        } else if (callback) {
+          callback(null);
+        }
         return true;
       }
-      return writeFn(chunk, ...args);
-    }) as typeof process.stdout.write;
+      return writeFn(chunk, encodingOrCallback, callback);
+    } as typeof process.stdout.write;
   };
 
-  process.stdout.write = wrapWrite(process.stdout.write.bind(process.stdout));
-  process.stderr.write = wrapWrite(process.stderr.write.bind(process.stderr));
+  process.stdout.write = wrapWrite(
+    process.stdout.write.bind(process.stdout) as WriteFn
+  );
+  process.stderr.write = wrapWrite(
+    process.stderr.write.bind(process.stderr) as WriteFn
+  );
 }
 
 function silenceMpvSpawnOutput(): void {
@@ -20,15 +41,18 @@ function silenceMpvSpawnOutput(): void {
   const childProcess = require('child_process') as typeof import('child_process');
   const originalSpawn = childProcess.spawn;
 
-  childProcess.spawn = ((command: any, args?: any, options?: any) => {
-    const cmd = typeof command === 'string' ? command : '';
+  childProcess.spawn = ((
+    command: string,
+    args?: readonly string[],
+    options?: import('child_process').SpawnOptions
+  ) => {
     const isMpv =
-      cmd === 'mpv' ||
-      cmd.endsWith('/mpv') ||
-      cmd.endsWith('/mpv-silent') ||
-      cmd.includes('/mpv');
+      command === 'mpv' ||
+      command.endsWith('/mpv') ||
+      command.endsWith('/mpv-silent') ||
+      command.includes('/mpv');
     if (isMpv) {
-      const nextOptions = { ...(options || {}) };
+      const nextOptions: import('child_process').SpawnOptions = { ...(options || {}) };
       if (!nextOptions.stdio) {
         nextOptions.stdio = 'ignore';
       } else if (Array.isArray(nextOptions.stdio)) {
@@ -36,10 +60,9 @@ function silenceMpvSpawnOutput(): void {
       } else {
         nextOptions.stdio = 'ignore';
       }
-      const child = originalSpawn(command, args, nextOptions);
-      return child;
+      return originalSpawn(command, args as string[], nextOptions);
     }
-    return originalSpawn(command, args, options);
+    return originalSpawn(command, args as string[], options ?? {});
   }) as typeof childProcess.spawn;
 }
 

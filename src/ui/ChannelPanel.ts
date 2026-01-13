@@ -2,6 +2,7 @@ import * as blessed from 'blessed';
 import { ChannelState } from '../audio/types';
 import { UI_STYLES } from './styles';
 import { truncateURL, formatVolume, formatProgress } from '../utils/youtube';
+import { ExtendedBorder, ExtendedBoxElement } from '../types/blessed-extended';
 
 const STATUS_BAR_HEIGHT = 3;
 
@@ -20,12 +21,12 @@ export class ChannelPanel {
       height: '50%',
       top: channelId === 0 ? 0 : '50%',
       tags: true,
-      border: { type: 'line' as any, fg: 'blue' } as any,
+      border: { type: 'line', fg: 'blue' } as ExtendedBorder as blessed.Widgets.Border,
       style: {
         fg: 'white',
         border: { fg: 'blue' },
       },
-    } as any);
+    });
 
     this.updateContent({
       id: channelId as 0 | 1,
@@ -144,7 +145,7 @@ export class ChannelPanel {
   }
 
   private visibleLength(text: string): number {
-    const box = this.box as any;
+    const box = this.box as unknown as ExtendedBoxElement;
     if (box && typeof box.strWidth === 'function') {
       return box.strWidth(text);
     }
@@ -159,12 +160,15 @@ export class ChannelPanel {
     if (this.headerScrubX === null) {
       return null;
     }
-    const coords = (this.box as any)._getCoords?.();
+    const box = this.box as unknown as ExtendedBoxElement;
+    const coords = box._getCoords?.();
     if (!coords) {
       return null;
     }
-    const x = coords.xi + (this.box.ileft || 0) + this.headerScrubX;
-    const y = coords.yi + (this.box.itop || 0);
+    const ileft = typeof this.box.ileft === 'number' ? this.box.ileft : 0;
+    const itop = typeof this.box.itop === 'number' ? this.box.itop : 0;
+    const x = coords.xi + ileft + this.headerScrubX;
+    const y = coords.yi + itop;
     return { x, y };
   }
 
